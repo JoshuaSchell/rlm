@@ -19,7 +19,7 @@ export function CodeBlock({ block, index }: CodeBlockProps) {
   const hasError = block.result?.stderr && block.result.stderr.length > 0;
   const hasOutput = block.result?.stdout && block.result.stdout.length > 0;
   const executionTime = block.result?.execution_time 
-    ? (block.result.execution_time * 1000).toFixed(2) 
+    ? block.result.execution_time.toFixed(2) 
     : null;
 
   return (
@@ -44,7 +44,7 @@ export function CodeBlock({ block, index }: CodeBlockProps) {
               <div className="flex items-center gap-2">
                 {executionTime && (
                   <Badge variant="outline" className="font-mono text-xs">
-                    {executionTime}ms
+                    {executionTime}s
                   </Badge>
                 )}
                 {hasError && (

@@ -177,26 +177,18 @@ class LocalREPL(NonIsolatedEnv):
             return "Error: No LM handler configured"
 
         try:
-            start_time = time.perf_counter()
             request = LMRequest(prompt=prompt, model=model)
             response = send_lm_request(self.lm_handler_address, request)
-            execution_time = time.perf_counter() - start_time
 
             if not response.success:
                 return f"Error: {response.error}"
 
             # Track this LLM call
             self._pending_llm_calls.append(
-                RLMChatCompletion(
-                    prompt=prompt,
-                    response=response.content or "",
-                    prompt_tokens=response.prompt_tokens,
-                    completion_tokens=response.completion_tokens,
-                    execution_time=execution_time,
-                )
+                response.chat_completion,
             )
 
-            return response.content or ""
+            return response.chat_completion.response
         except Exception as e:
             return f"Error: LM query failed - {e}"
 

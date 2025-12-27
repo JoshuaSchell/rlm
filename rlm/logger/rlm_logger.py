@@ -4,7 +4,7 @@ Logger for RLM iterations.
 Writes RLMIteration data to JSON-lines files for analysis and debugging.
 """
 
-from rlm.core.types import RLMIteration
+from rlm.core.types import RLMIteration, RLMMetadata
 
 from datetime import datetime
 import json
@@ -26,12 +26,31 @@ class RLMLogger:
         )
 
         self._iteration_count = 0
+        self._metadata_logged = False
+
+    def log_metadata(self, metadata: RLMMetadata):
+        """Log RLM metadata as the first entry in the file."""
+        if self._metadata_logged:
+            return
+
+        entry = {
+            "type": "metadata",
+            "timestamp": datetime.now().isoformat(),
+            **metadata.to_dict(),
+        }
+
+        with open(self.log_file_path, "a") as f:
+            json.dump(entry, f)
+            f.write("\n")
+
+        self._metadata_logged = True
 
     def log(self, iteration: RLMIteration):
         """Log an RLMIteration to the file."""
         self._iteration_count += 1
 
         entry = {
+            "type": "iteration",
             "iteration": self._iteration_count,
             "timestamp": datetime.now().isoformat(),
             **iteration.to_dict(),

@@ -132,7 +132,7 @@ export function ExecutionPanel({ iteration }: ExecutionPanelProps) {
                                 {call.completion_tokens} out
                               </Badge>
                               <Badge variant="outline" className="text-[10px] font-mono">
-                                {(call.execution_time * 1000).toFixed(0)}ms
+                                {call.execution_time.toFixed(2)}s
                               </Badge>
                             </div>
                           </div>

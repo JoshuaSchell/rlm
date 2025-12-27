@@ -8,6 +8,8 @@ from rlm.core.types import (
     CodeBlock,
     ClientBackend,
     EnvironmentType,
+    RLMChatCompletion,
+    RLMMetadata,
 )
 from rlm.utils.prompts import (
     build_rlm_system_prompt,
@@ -20,9 +22,11 @@ from rlm.utils.parsing import (
     find_final_answer,
     format_iteration,
 )
+from rlm.utils.rlm_utils import filter_sensitive_keys
 
 from typing import Dict, Any, Optional, List
 from contextlib import contextmanager
+import time
 
 
 class RLM:
@@ -77,6 +81,20 @@ class RLM:
         )
         self.logger = logger
 
+        # Log metadata if logger is provided
+        if self.logger:
+            metadata = RLMMetadata(
+                root_model=backend_kwargs.get("model_name", "unknown"),
+                max_depth=max_depth,
+                max_iterations=max_iterations,
+                backend=backend,
+                backend_kwargs=filter_sensitive_keys(backend_kwargs),
+                environment_type=environment,
+                environment_kwargs=filter_sensitive_keys(environment_kwargs),
+                other_backends=other_backends,
+            )
+            self.logger.log_metadata(metadata)
+
     @contextmanager
     def _spawn_completion_context(self, prompt: str | Dict[str, Any]):
         """
@@ -125,7 +143,7 @@ class RLM:
 
     def completion(
         self, prompt: str | Dict[str, Any], root_prompt: Optional[str] = None
-    ) -> str:
+    ) -> RLMChatCompletion:
         """
         Recursive Language Model completion call. This is the main entry point for querying an RLM, and
         can replace a regular LM completion call.
@@ -139,6 +157,7 @@ class RLM:
         Returns:
             A final answer as a string.
         """
+        time_start = time.perf_counter()
         with self._spawn_completion_context(prompt) as (lm_handler, environment):
             message_history = self._setup_prompt(prompt)
 
@@ -161,7 +180,14 @@ class RLM:
                     self.logger.log(iteration)
 
                 if final_answer:
-                    return final_answer
+                    time_end = time.perf_counter()
+                    return RLMChatCompletion(
+                        root_model=self.backend_kwargs.get("model_name", "unknown"),
+                        prompt=prompt,
+                        response=final_answer,
+                        usage_summary=lm_handler.get_usage_summary(),
+                        execution_time=time_end - time_start,
+                    )
 
                 # Format the iteration for the next prompt.
                 new_messages = format_iteration(iteration)
@@ -183,6 +209,7 @@ class RLM:
         Perform a single iteration of the RLM, including prompting the model
         and code execution + tool execution.
         """
+        iter_start = time.perf_counter()
         response = lm_handler.completion(prompt)
         code_block_strs = find_code_blocks(response)
         code_blocks = []
@@ -191,7 +218,13 @@ class RLM:
             code_result: REPLResult = environment.execute_code(code_block_str)
             code_blocks.append(CodeBlock(code=code_block_str, result=code_result))
 
-        return RLMIteration(prompt=prompt, response=response, code_blocks=code_blocks)
+        iteration_time = time.perf_counter() - iter_start
+        return RLMIteration(
+            prompt=prompt,
+            response=response,
+            code_blocks=code_blocks,
+            iteration_time=iteration_time,
+        )
 
     def _default_answer(
         self, message_history: List[Dict[str, Any]], lm_handler: LMHandler

@@ -1,15 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 
-from dataclasses import dataclass
-
-
-@dataclass
-class CostSummary:
-    total_calls: int
-    total_cost: float
-    total_input_tokens: int
-    total_output_tokens: int
+from rlm.core.types import UsageSummary
 
 
 class BaseLM(ABC):
@@ -31,11 +23,11 @@ class BaseLM(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_cost_summary(self) -> CostSummary:
-        """Get cost summary for all calls."""
+    def get_usage_summary(self) -> UsageSummary:
+        """Get cost summary for all model calls."""
         raise NotImplementedError
 
     @abstractmethod
-    def get_last_usage(self) -> Tuple[int, int]:
-        """Get the last usage of the model."""
+    def get_last_usage(self) -> UsageSummary:
+        """Get the last cost summary of the model."""
         raise NotImplementedError

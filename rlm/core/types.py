@@ -26,26 +26,87 @@ def _serialize_value(value: Any) -> Any:
 
 
 ########################################################
+########    Types for LM Cost Tracking         #########
+########################################################
+
+
+@dataclass
+class ModelUsageSummary:
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+
+    def to_dict(self):
+        return {
+            "total_calls": self.total_calls,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ModelUsageSummary":
+        return cls(
+            total_calls=data.get("total_calls"),
+            total_input_tokens=data.get("total_input_tokens"),
+            total_output_tokens=data.get("total_output_tokens"),
+        )
+
+
+@dataclass
+class UsageSummary:
+    model_usage_summaries: Dict[str, ModelUsageSummary]
+
+    def to_dict(self):
+        return {
+            "model_usage_summaries": {
+                model: usage_summary.to_dict()
+                for model, usage_summary in self.model_usage_summaries.items()
+            },
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "UsageSummary":
+        return cls(
+            model_usage_summaries={
+                model: ModelUsageSummary.from_dict(usage_summary)
+                for model, usage_summary in data.get(
+                    "model_usage_summaries", {}
+                ).items()
+            },
+        )
+
+
+########################################################
 ########   Types for REPL and RLM Iterations   #########
 ########################################################
 @dataclass
 class RLMChatCompletion:
     """Record of a single LLM call made from within the environment."""
 
+    root_model: str
     prompt: str | Dict[str, Any]
     response: str
-    prompt_tokens: int
-    completion_tokens: int
+    usage_summary: UsageSummary
     execution_time: float
 
     def to_dict(self):
         return {
+            "root_model": self.root_model,
             "prompt": self.prompt,
             "response": self.response,
-            "prompt_tokens": self.prompt_tokens,
-            "completion_tokens": self.completion_tokens,
+            "usage_summary": self.usage_summary.to_dict(),
             "execution_time": self.execution_time,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RLMChatCompletion":
+        return cls(
+            root_model=data.get("root_model"),
+            prompt=data.get("prompt"),
+            response=data.get("response"),
+            usage_summary=UsageSummary.from_dict(data.get("usage_summary")),
+            execution_time=data.get("execution_time"),
+        )
 
 
 @dataclass
@@ -98,6 +159,7 @@ class RLMIteration:
     response: str
     code_blocks: List[CodeBlock]
     final_answer: Optional[str] = None
+    iteration_time: Optional[float] = None
 
     def to_dict(self):
         return {
@@ -105,6 +167,42 @@ class RLMIteration:
             "response": self.response,
             "code_blocks": [code_block.to_dict() for code_block in self.code_blocks],
             "final_answer": self.final_answer,
+            "iteration_time": self.iteration_time,
+        }
+
+
+########################################################
+########   Types for RLM Metadata   #########
+########################################################
+
+
+@dataclass
+class RLMMetadata:
+    """Metadata about the RLM configuration."""
+
+    root_model: str
+    max_depth: int
+    max_iterations: int
+    backend: str
+    backend_kwargs: Dict[str, Any]
+    environment_type: str
+    environment_kwargs: Dict[str, Any]
+    other_backends: Optional[List[str]] = None
+
+    def to_dict(self):
+        return {
+            "root_model": self.root_model,
+            "max_depth": self.max_depth,
+            "max_iterations": self.max_iterations,
+            "backend": self.backend,
+            "backend_kwargs": {
+                k: _serialize_value(v) for k, v in self.backend_kwargs.items()
+            },
+            "environment_type": self.environment_type,
+            "environment_kwargs": {
+                k: _serialize_value(v) for k, v in self.environment_kwargs.items()
+            },
+            "other_backends": self.other_backends,
         }
 
 

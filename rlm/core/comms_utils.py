@@ -11,6 +11,7 @@ import socket
 import struct
 import json
 
+from rlm.core.types import RLMChatCompletion
 
 # =============================================================================
 # Message Dataclasses
@@ -44,10 +45,8 @@ class LMRequest:
 class LMResponse:
     """Response message from the LM Handler."""
 
-    content: Optional[str] = None
     error: Optional[str] = None
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
+    chat_completion: Optional[RLMChatCompletion] = None
 
     @property
     def success(self) -> bool:
@@ -57,32 +56,27 @@ class LMResponse:
     def to_dict(self) -> dict:
         """Convert to dict, excluding None values."""
         if self.error is not None:
-            return {"error": self.error}
+            return {"error": self.error, "chat_completion": None}
+        if self.chat_completion is not None:
+            return {"chat_completion": self.chat_completion.to_dict(), "error": None}
         return {
-            "content": self.content or "",
-            "prompt_tokens": self.prompt_tokens,
-            "completion_tokens": self.completion_tokens,
+            "error": "No chat completion or error provided.",
+            "chat_completion": None,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "LMResponse":
         """Create from dict."""
         return cls(
-            content=data.get("content"),
             error=data.get("error"),
-            prompt_tokens=data.get("prompt_tokens", 0),
-            completion_tokens=data.get("completion_tokens", 0),
+            chat_completion=RLMChatCompletion.from_dict(data.get("chat_completion")),
         )
 
     @classmethod
-    def success_response(
-        cls, content: str, prompt_tokens: int = 0, completion_tokens: int = 0
-    ) -> "LMResponse":
+    def success_response(cls, chat_completion: RLMChatCompletion) -> "LMResponse":
         """Create a successful response."""
         return cls(
-            content=content,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
+            chat_completion=chat_completion,
         )
 
     @classmethod

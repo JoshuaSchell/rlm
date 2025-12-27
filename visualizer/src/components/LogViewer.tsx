@@ -19,7 +19,7 @@ interface LogViewerProps {
 
 export function LogViewer({ logFile, onBack }: LogViewerProps) {
   const [selectedIteration, setSelectedIteration] = useState(0);
-  const { iterations, metadata } = logFile;
+  const { iterations, metadata, config } = logFile;
 
   const goToPrevious = useCallback(() => {
     setSelectedIteration(prev => Math.max(0, prev - 1));
@@ -66,6 +66,9 @@ export function LogViewer({ logFile, onBack }: LogViewerProps) {
                   <span className="text-primary">◈</span>
                   {logFile.fileName}
                 </h1>
+                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                  {config.root_model ?? 'Unknown model'} • {config.backend ?? 'Unknown backend'} • {config.environment_type ?? 'Unknown env'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -132,7 +135,7 @@ export function LogViewer({ logFile, onBack }: LogViewerProps) {
             />
             <StatsCard
               label="Exec"
-              value={`${(metadata.totalExecutionTime * 1000).toFixed(0)}ms`}
+              value={`${metadata.totalExecutionTime.toFixed(2)}s`}
               icon="⏱"
               variant="yellow"
             />

@@ -6,10 +6,12 @@ Uses a multi-threaded socket server. Protocol: 4-byte length prefix + JSON paylo
 
 from rlm.clients.base_lm import BaseLM
 from rlm.core.comms_utils import socket_send, socket_recv, LMRequest, LMResponse
+from rlm.core.types import RLMChatCompletion, UsageSummary
 
 from typing import Optional, Dict
 from socketserver import ThreadingTCPServer, StreamRequestHandler
 from threading import Thread
+import time
 
 
 class LMRequestHandler(StreamRequestHandler):
@@ -34,10 +36,19 @@ class LMRequestHandler(StreamRequestHandler):
             handler: LMHandler = self.server.lm_handler  # type: ignore
             client = handler.get_client(request.model)
 
+            start_time = time.perf_counter()
             content = client.completion(request.prompt)
-            prompt_tokens, completion_tokens = client.get_last_usage()
+            end_time = time.perf_counter()
+
+            usage_summary = client.get_last_usage()
             response = LMResponse.success_response(
-                content, prompt_tokens, completion_tokens
+                chat_completion=RLMChatCompletion(
+                    root_model=request.model,
+                    prompt=request.prompt,
+                    response=content,
+                    usage_summary=usage_summary,
+                    execution_time=end_time - start_time,
+                )
             )
             socket_send(self.connection, response.to_dict())
 
@@ -73,6 +84,8 @@ class LMHandler:
         self._server: Optional[ThreadingLMServer] = None
         self._thread: Optional[Thread] = None
         self._port = port
+
+        self.register_client(client.model_name, client)
 
     def register_client(self, model_name: str, client: BaseLM) -> None:
         """Register a client for a specific model name."""
@@ -127,3 +140,11 @@ class LMHandler:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
         return False
+
+    def get_usage_summary(self) -> UsageSummary:
+        """Get the usage summary for all clients, merged into a single dict."""
+        merged = {}
+        for client in self.clients.values():
+            client_summary = client.get_usage_summary()
+            merged.update(client_summary.model_usage_summaries)
+        return UsageSummary(model_usage_summaries=merged)
